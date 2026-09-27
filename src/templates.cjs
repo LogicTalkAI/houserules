@@ -30,7 +30,7 @@ const POLICY_JSON = {
   disable: [],
   rules: [],
   protectedPaths: [],
-  secrets: { scanOnCommit: true, allow: [] },
+  secrets: { scanOnCommit: true, allow: [], ignorePaths: [] },
 };
 
 const README_MD = `# .houserules

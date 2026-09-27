@@ -92,12 +92,12 @@ test('init, sync, hooks, secret scan, check, uninstall', async t => {
   });
 
   await t.test('the pre-commit hook stops a key and lets clean code through', () => {
-    write(d, 'config.js', `module.exports = { key: "${'AKIA' + 'IOSFODNN7EXAMPLE'}" };\n`);
+    write(d, 'config.js', `module.exports = { key: "${'AKIA' + 'Z7QK4WJ2M9XB3N5P'}" };\n`);
     git(d, 'add', 'config.js');
     const blocked = spawnSync('git', ['commit', '-q', '-m', 'add config'], { cwd: d, encoding: 'utf8' });
     assert.notEqual(blocked.status, 0, 'commit with a key must fail');
     assert.match(blocked.stderr, /aws-access-key-id/);
-    assert.doesNotMatch(blocked.stderr, /IOSFODNN7EXAMPLE/, 'the key itself is never printed');
+    assert.doesNotMatch(blocked.stderr, /Z7QK4WJ2M9XB3N5P/, 'the key itself is never printed');
     write(d, 'config.js', 'module.exports = { key: process.env.AWS_KEY };\n');
     git(d, 'add', '-A');
     const ok = spawnSync('git', ['commit', '-q', '-m', 'setup'], { cwd: d, encoding: 'utf8' });

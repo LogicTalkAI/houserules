@@ -110,7 +110,7 @@ node .houserules/runtime/houserules.cjs test "git push --force origin main"
     { "id": "clean-dist", "action": "allow", "match": "^rm -rf dist$", "why": "Build output is safe to delete." }
   ],
   "protectedPaths": ["config/master.key"],
-  "secrets": { "scanOnCommit": true, "allow": ["EXAMPLE$"] }
+  "secrets": { "scanOnCommit": true, "allow": ["^AKIA0000"], "ignorePaths": ["vendor/", "test/fixtures/"] }
 }
 ```
 
@@ -119,7 +119,9 @@ node .houserules/runtime/houserules.cjs test "git push --force origin main"
 - `rules`: your own. `deny` blocks, `ask` needs a person, `allow` makes an exception. An exception for one part of a
   chained command never excuses another part.
 - `protectedPaths`: extra files assistants must not read or edit.
-- `secrets.allow`: patterns for known false alarms. You can also put `houserules:allow-secret` in a comment on a line.
+- `secrets.allow`: patterns for known false alarms; `secrets.ignorePaths`: folders to skip (vendored code, scraped
+  pages, fixtures). You can also put `houserules:allow-secret` in a comment on a line. Obvious placeholders such as
+  `sk-ant-your-key-here` or `...EXAMPLE` are never reported.
 
 **Skills** go in `.houserules/skills/<name>/SKILL.md` using the open [Agent Skills](https://agentskills.io/specification)
 format (`name` matching the folder, and a `description`). House Rules copies them to `.claude/skills/` and

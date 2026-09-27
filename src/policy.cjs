@@ -55,7 +55,7 @@ const DEFAULT_POLICY = {
   disable: [],
   rules: [],
   protectedPaths: [],
-  secrets: { scanOnCommit: true, allow: [] },
+  secrets: { scanOnCommit: true, allow: [], ignorePaths: [] },
 };
 
 function readJson(file) {

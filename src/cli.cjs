@@ -132,15 +132,16 @@ function cmdScan(argv) {
   const root = findRoot();
   const { policy } = loadPolicy(root);
   const allow = (policy.secrets && policy.secrets.allow) || [];
+  const ignore = (policy.secrets && policy.secrets.ignorePaths) || [];
   let res;
   if (flag(argv, '--staged')) {
     if (policy.secrets && policy.secrets.scanOnCommit === false) return 0;
-    res = S.scanStaged(root, allow);
+    res = S.scanStaged(root, allow, ignore);
   } else {
     const paths = argv.filter(a => !a.startsWith('--'));
     const targets = paths.length ? paths : (trackedFiles(root) || []);
-    res = targets.length ? S.scanPaths(root, targets, allow) : S.scanPaths(root, ['.'], allow);
-    for (const f of targets) if (S.forbiddenFile(f)) res.hits.push({ file: f, line: 0, id: 'forbidden-file', preview: 'this kind of file holds secrets; remove it from git and add it to .gitignore' });
+    res = targets.length ? S.scanPaths(root, targets, allow, ignore) : S.scanPaths(root, ['.'], allow, ignore);
+    for (const f of targets) if (S.forbiddenFile(f) && !S.ignored(f, ignore)) res.hits.push({ file: f, line: 0, id: 'forbidden-file', preview: 'this kind of file holds secrets; remove it from git and add it to .gitignore' });
   }
   if (res.error) { err(`House Rules: ${res.error}`); return 0; }
   if (!res.hits.length) { if (!flag(argv, '--staged')) out(`House Rules: no secrets found in ${res.files} file(s).`); return 0; }
@@ -314,8 +315,9 @@ function cmdCheck() {
   if (drift.changed.length) { err(`Out of sync with .houserules/ (run "houserules sync" and commit): ${drift.changed.join(', ')}`); fail++; }
   const files = trackedFiles(root);
   const allow = (plan.policy.secrets && plan.policy.secrets.allow) || [];
-  const res = S.scanPaths(root, files || ['.'], allow);
-  for (const f of files || []) if (S.forbiddenFile(f)) res.hits.push({ file: f, line: 0, id: 'forbidden-file', preview: 'secret-bearing file is tracked by git' });
+  const ignore = (plan.policy.secrets && plan.policy.secrets.ignorePaths) || [];
+  const res = S.scanPaths(root, files || ['.'], allow, ignore);
+  for (const f of files || []) if (S.forbiddenFile(f) && !S.ignored(f, ignore)) res.hits.push({ file: f, line: 0, id: 'forbidden-file', preview: 'secret-bearing file is tracked by git' });
   if (res.hits.length) { err('Possible secrets in tracked files:'); printHits(res.hits); fail++; }
   out(fail ? `House Rules check failed (${fail} problem group(s)).` : `House Rules check passed: in sync, policy valid, ${res.files} tracked file(s) scanned, no secrets.`);
   return fail ? 1 : 0;

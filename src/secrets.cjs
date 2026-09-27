@@ -13,8 +13,8 @@ const PATTERNS = [
   { id: 'slack-token', re: /\bxox[abposr]-[A-Za-z0-9-]{10,}\b/ },
   { id: 'stripe-live-key', re: /\b(?:sk|rk)_live_[A-Za-z0-9]{20,}\b/ },
   { id: 'stripe-webhook-secret', re: /\bwhsec_[A-Za-z0-9+/=]{24,}\b/ },
-  { id: 'anthropic-key', re: /\bsk-ant-[A-Za-z0-9_-]{20,}\b/ },
-  { id: 'openai-key', re: /\bsk-(?:proj|svcacct|admin)-[A-Za-z0-9_-]{20,}\b|\bsk-[A-Za-z0-9]{20}T3BlbkFJ[A-Za-z0-9]{20}\b/ },
+  { id: 'anthropic-key', re: /\bsk-ant-(?:api|admin)\d{2}-[A-Za-z0-9_-]{40,}/ },
+  { id: 'openai-key', re: /\bsk-(?:proj|svcacct|admin)-[A-Za-z0-9_-]{40,}|\bsk-[A-Za-z0-9]{20}T3BlbkFJ[A-Za-z0-9]{20}\b/ },
   { id: 'xai-key', re: /\bxai-[A-Za-z0-9]{40,}\b/ },
   { id: 'google-api-key', re: /\bAIza[0-9A-Za-z_-]{35}\b/ },
   { id: 'npm-token', re: /\bnpm_[A-Za-z0-9]{36}\b/ },
@@ -27,6 +27,8 @@ const FORBIDDEN_FILES = [/(^|\/)\.env$/, /(^|\/)\.env\.(?!example$|sample$|templ
 
 const ALLOW_MARK = 'houserules:allow-secret';
 const MAX_BYTES = 1024 * 1024;
+// Documentation placeholders ("sk-ant-your-key-here", "...EXAMPLE", "xxxxxxxx") are not secrets.
+const PLACEHOLDER = /example|sample|placeholder|your[_-]?(?:api[_-]?)?(?:key|token|secret)|replace[_-]?me|change[_-]?me|dummy|fake|redacted|x{6,}|\.{3}|<|>/i;
 
 function scanText(text, file = '', allow = []) {
   const hits = [];
@@ -36,10 +38,17 @@ function scanText(text, file = '', allow = []) {
     if (line.includes(ALLOW_MARK)) return;
     for (const p of PATTERNS) {
       const m = line.match(p.re);
-      if (m && !allowRes.some(a => a.test(m[0]))) hits.push({ file, line: i + 1, id: p.id, preview: redact(m[0]) });
+      if (!m || PLACEHOLDER.test(m[0]) || allowRes.some(a => a.test(m[0]))) continue;
+      hits.push({ file, line: i + 1, id: p.id, preview: redact(m[0]) });
     }
   });
   return hits;
+}
+
+// secrets.ignorePaths: folder or file prefixes to skip (vendored code, scraped pages, fixtures).
+function ignored(rel, ignorePaths = []) {
+  const r = rel.replace(/\\/g, '/').replace(/^\.\//, '');
+  return ignorePaths.some(p => { const q = String(p).replace(/\\/g, '/').replace(/^\.\//, ''); return q && (r === q.replace(/\/$/, '') || r.startsWith(q.endsWith('/') ? q : q + '/')); });
 }
 
 // Never print a found secret back to the terminal (terminals are logged and screen-shared).
@@ -50,12 +59,13 @@ function forbiddenFile(rel) { return FORBIDDEN_FILES.some(re => re.test(rel.repl
 function git(args, cwd) { return execFileSync('git', args, { cwd, encoding: 'buffer', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 }); }
 
 // Scans what is about to be committed (the staged version of each file, not the working copy).
-function scanStaged(root, allow = []) {
+function scanStaged(root, allow = [], ignorePaths = []) {
   let names = [];
   try { names = git(['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z'], root).toString('utf8').split('\0').filter(Boolean); }
   catch { return { hits: [], files: 0, error: 'Not a git repository, or git is not installed.' }; }
   const hits = [];
   for (const rel of names) {
+    if (ignored(rel, ignorePaths)) continue;
     if (forbiddenFile(rel)) { hits.push({ file: rel, line: 0, id: 'forbidden-file', preview: 'this kind of file holds secrets; add it to .gitignore' }); continue; }
     let buf;
     try { buf = git(['show', `:${rel}`], root); } catch { continue; }
@@ -66,7 +76,7 @@ function scanStaged(root, allow = []) {
 }
 
 // Scans files on disk (for "houserules scan <paths>" and CI). Skips .git, node_modules, and binary/large files.
-function scanPaths(root, targets, allow = []) {
+function scanPaths(root, targets, allow = [], ignorePaths = []) {
   const hits = [];
   let files = 0;
   const skip = new Set(['.git', 'node_modules', '.houserules', 'dist', 'build', '.next', '.wrangler', 'coverage']);
@@ -75,6 +85,7 @@ function scanPaths(root, targets, allow = []) {
     if (st.isDirectory()) { if (skip.has(path.basename(p))) return; for (const f of fs.readdirSync(p)) walk(path.join(p, f)); return; }
     if (!st.isFile() || st.size > MAX_BYTES) return;
     const rel = path.relative(root, p).replace(/\\/g, '/');
+    if (ignored(rel, ignorePaths)) return;
     const buf = fs.readFileSync(p);
     if (buf.includes(0)) return;
     files++;
@@ -84,4 +95,4 @@ function scanPaths(root, targets, allow = []) {
   return { hits, files };
 }
 
-module.exports = { PATTERNS, FORBIDDEN_FILES, ALLOW_MARK, scanText, scanStaged, scanPaths, redact, forbiddenFile };
+module.exports = { PATTERNS, FORBIDDEN_FILES, ALLOW_MARK, PLACEHOLDER, scanText, scanStaged, scanPaths, redact, forbiddenFile, ignored };
