@@ -197,7 +197,7 @@ and settings it changed go back to what they were.
 
 ## Requirements
 
-Node.js 18 or newer, which every assistant above already needs. Git for the secret scan. Windows, macOS, and Linux.
+Node.js 18 or newer. Git, for the secret scan. Windows, macOS, and Linux.
 
 ## License
 
