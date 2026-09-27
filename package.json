@@ -1,0 +1,49 @@
+{
+  "name": "@logictalkai/houserules",
+  "version": "1.0.0",
+  "description": "One rulebook for every AI coding assistant. Write your rules, skills, and guardrails once; Claude Code, Codex, Copilot, Cursor, Gemini CLI, and Grok all follow them, with a command guard and a secret scan that actually enforce them.",
+  "bin": {
+    "houserules": "bin/houserules.cjs"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "docs/",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "governance",
+    "claude-code",
+    "codex",
+    "copilot",
+    "cursor",
+    "gemini-cli",
+    "grok",
+    "agents-md",
+    "skills",
+    "hooks",
+    "guardrails",
+    "vscode"
+  ],
+  "author": "Logic Talk AI LLC",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LogicTalkAI/houserules.git"
+  },
+  "homepage": "https://github.com/LogicTalkAI/houserules#readme",
+  "bugs": {
+    "url": "https://github.com/LogicTalkAI/houserules/issues"
+  }
+}
