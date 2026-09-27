@@ -304,7 +304,7 @@ function syncSkills(root, skills, { dryRun, undo }) {
 function installRuntime(root, fromDir = __dirname, { dryRun = false } = {}) {
   const dest = path.join(root, '.houserules', 'runtime');
   const changed = [];
-  const entry = "'use strict';\n// House Rules runtime entry. Generated; do not edit. Update with: npx @logictalkai/houserules@latest sync\nrequire('./cli.cjs').main(process.argv.slice(2));\n";
+  const entry = "'use strict';\n// House Rules runtime entry. Generated; do not edit. Update with: npx github:LogicTalkAI/houserules sync\nrequire('./cli.cjs').main(process.argv.slice(2));\n";
   const want = [...RUNTIME_FILES.map(f => [f, fs.readFileSync(path.join(fromDir, f), 'utf8')]), ['houserules.cjs', entry]];
   for (const [f, content] of want) {
     const cur = readIf(path.join(dest, f));

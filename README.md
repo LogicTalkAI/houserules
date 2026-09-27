@@ -61,7 +61,10 @@ node .houserules/runtime/houserules.cjs doctor
 whether each one blocked and allowed correctly. It also lists the one-time approvals each assistant asks for the first
 time it sees project hooks. Those approvals are a security feature of the assistants; House Rules cannot click them for you.
 
-Commit `.houserules/` and the generated files. Teammates get the same rules and guards when they pull, with nothing to install.
+Commit `.houserules/` and the generated files. Teammates get the same rules and assistant hooks when they pull, with
+nothing to install. Git does not share its own hooks, so each person runs
+`node .houserules/runtime/houserules.cjs init` once after cloning to turn on the pre-commit secret scan. The CI check
+below catches secrets either way.
 
 ## Your rules, in plain words
 
@@ -78,15 +81,17 @@ Every assistant's files update. The starter file covers working style, safety, a
 Built-in command rules (list them any time with `houserules rules`):
 
 - **Blocked:** recursive delete of `/`, `~`, `*` or `.`; PowerShell equivalents; disk formatting; fork bombs;
-  `chmod -R 777`; piping a download into a shell (`curl … | bash`, `irm … | iex`); printing `.env`, private keys or
-  credential files; dumping all environment variables; echoing a variable named like a key or token; `--no-verify`
+  `chmod -R 777`; piping a download into a shell (`curl … | bash`, `irm … | iex`); printing, copying, encoding, or
+  uploading `.env`, private keys, or credential files (`.env.example` and templates are fine); dumping all environment variables; echoing a variable named like a key or token; `--no-verify`
   on commits and pushes; force-pushing `main`, `master` or `production`.
 - **Needs a person:** `git push`, force push, `git reset --hard`, `git clean -f`, recursive deletes, publishing and
   deploying (npm, Wrangler, Vercel, Netlify, Firebase, Fly, Terraform, Pulumi, kubectl, Helm, Docker, GitHub releases,
   and more), deleting cloud resources, `DROP TABLE`, `sudo`.
 - **Protected files:** `.env*`, `.dev.vars`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, SSH keys, `credentials.json`, `secrets.*`.
 
-Chained and wrapped commands are checked part by part, so `npm test && rm -rf ~` and `bash -c 'rm -rf /'` are caught.
+Chained, wrapped, and substituted commands are checked part by part, so `npm test && rm -rf ~`, `bash -c 'rm -rf /'`,
+and `echo $(cat .env)` are caught. Git options before the subcommand (`git -C dir push --force origin main`) do not
+hide it, and commit messages are never mistaken for commands.
 Claude Code shows its own approval prompt for "needs a person" commands; the other assistants are told to stop and ask you.
 
 Try a command without running it:
@@ -110,7 +115,8 @@ node .houserules/runtime/houserules.cjs test "git push --force origin main"
     { "id": "clean-dist", "action": "allow", "match": "^rm -rf dist$", "why": "Build output is safe to delete." }
   ],
   "protectedPaths": ["config/master.key"],
-  "secrets": { "scanOnCommit": true, "allow": ["^AKIA0000"], "ignorePaths": ["vendor/", "test/fixtures/"] }
+  "secrets": { "scanOnCommit": true, "allow": ["^AKIA0000"], "ignorePaths": ["vendor/", "test/fixtures/"] },
+  "failClosed": false
 }
 ```
 
@@ -119,6 +125,8 @@ node .houserules/runtime/houserules.cjs test "git push --force origin main"
 - `rules`: your own. `deny` blocks, `ask` needs a person, `allow` makes an exception. An exception for one part of a
   chained command never excuses another part.
 - `protectedPaths`: extra files assistants must not read or edit.
+- `failClosed`: `true` blocks a command when the guard itself hits an error. The default, `false`, lets it through, so
+  a House Rules bug never stops every command your assistant runs.
 - `secrets.allow`: patterns for known false alarms; `secrets.ignorePaths`: folders to skip (vendored code, scraped
   pages, fixtures). You can also put `houserules:allow-secret` in a comment on a line. Obvious placeholders such as
   `sk-ant-your-key-here` or `...EXAMPLE` are never reported.
@@ -170,12 +178,15 @@ or into a ChatGPT Project's instructions.
 
 ## How safe is this?
 
-House Rules is a strong safety net, not a sandbox. Know its limits:
+House Rules is a safety net, not a sandbox. Know its limits:
 
 - **Hooks run only after you approve them.** Codex, Grok, and Claude Code ask you to trust a project's hooks the first
   time. Until then, the guard does not run. `doctor` lists these steps.
-- **Most assistants let a command through if a hook crashes** (Grok, Gemini, Cursor, VS Code fail open; Copilot's CLI
-  fails closed). House Rules is built to always answer, and `doctor` tests that it does.
+- **Errors let commands through by default.** If the guard hits an error, cannot find its runtime, or Node.js is not
+  on the PATH, the command runs unchecked and a warning is printed. Set `"failClosed": true` to block on guard errors
+  instead (a missing runtime or missing Node.js still cannot be caught, because the guard never starts). Separately,
+  Grok, Gemini, Cursor, and VS Code let a command through when any hook crashes; Copilot's CLI blocks. `doctor`
+  checks that every hook starts and answers.
 - **Pattern checks can be sidestepped** by a determined or confused agent (a new script file, an unusual shell).
   Keep each assistant's own approval and sandbox settings on; House Rules adds to them, it does not replace them.
 - **The secret scan knows published key formats** (AWS, GitHub, Stripe, OpenAI, Anthropic, xAI, Google, Slack, npm,

@@ -4,9 +4,9 @@ House Rules is a guard for AI coding assistants, so a way around it is a securit
 
 ## Report a problem
 
-Email **franco@logictalk.ai** with "House Rules security" in the subject. Include the command or file that got through,
-the assistant and version, and your operating system. Please do not open a public issue for a bypass until a fix is out.
-We aim to reply within one week.
+Use GitHub's private reporting: open the repository's **Security** tab and choose **Report a vulnerability**. Include
+the command or file that got through, the assistant and its version, and your operating system. Please do not open a
+public issue for a bypass until a fix is released.
 
 ## In scope
 
@@ -20,6 +20,7 @@ We aim to reply within one week.
 - An assistant running a command before you have approved its project hooks (a trust step the assistant requires).
 - Commands the default rules do not claim to cover. Suggest a new rule instead.
 - Secrets with no recognizable format.
+- Commands that run while the guard cannot start (Node.js missing) or errors with `failClosed` off; both are documented.
 
 ## Design
 

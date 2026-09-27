@@ -19,18 +19,27 @@ function splitCommand(cmd) {
   return parts.map(s => s.trim()).filter(Boolean);
 }
 
-// Commands wrapped in another shell ("bash -c '...'", "powershell -Command ...", "cmd /c ...") are unwrapped too.
+// Commands wrapped in another shell ("bash -c '...'", "powershell -Command ...", "cmd /c ...") and command
+// substitutions ("$(...)", backticks, "<(...)") are unwrapped and checked too.
 function innerCommands(cmd) {
   const out = [];
-  const re = /\b(?:ba|z|da|k)?sh\s+-c\s+(["'])([\s\S]*?)\1|\b(?:pwsh|powershell)(?:\.exe)?\b[^"']*?-(?:c|Command)\s+(["'])([\s\S]*?)\3|\bcmd(?:\.exe)?\s+\/[ck]\s+(["']?)([\s\S]*?)\5(?=$|[;&|])/gi;
+  const re = /\b(?:ba|z|da|k)?sh\s+-c\s+(["'])([\s\S]*?)\1|\b(?:pwsh|powershell)(?:\.exe)?\b[^"']*?-(?:c|Command)\s+(["'])([\s\S]*?)\3|\bcmd(?:\.exe)?\s+\/[ck]\s+(["']?)([\s\S]*?)\5(?=$|[;&|])|\$\(([^()]*)\)|`([^`]*)`|<\(([^()]*)\)|\beval\s+(["'])([\s\S]*?)\10/gi;
   let m;
-  while ((m = re.exec(cmd))) out.push(m[2] || m[4] || m[6] || '');
+  while ((m = re.exec(cmd))) out.push(m[2] || m[4] || m[6] || m[7] || m[8] || m[9] || m[11] || '');
   return out.filter(Boolean);
 }
 
-// Leading "VAR=value" assignments and "time"/"nice" wrappers do not change what runs.
+// Normalizes a command so rules see what actually runs:
+// - leading "VAR=value" assignments and time/nice/nohup wrappers are dropped;
+// - git's global options before the subcommand ("git -C dir", "git -c k=v", "--git-dir=...") are dropped, so
+//   "git -C . push --force origin main" is judged as "git push --force origin main";
+// - commit and tag messages are emptied, because their text never runs ("fix the git push -n bug").
 function stripPrefixes(s) {
-  return s.replace(/^(?:\s*[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)+/, '').replace(/^(?:time|nice(?:\s+-n\s+-?\d+)?|nohup)\s+/, '');
+  return s
+    .replace(/^(?:\s*[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)+/, '')
+    .replace(/^(?:time|nice(?:\s+-n\s+-?\d+)?|nohup)\s+/, '')
+    .replace(/\bgit((?:\s+(?:-C\s+(?:"[^"]*"|'[^']*'|\S+)|-c\s+\S+|--(?:git-dir|work-tree|namespace|exec-path)(?:=|\s+)\S+|--no-pager|--paginate|-p|--bare|--no-replace-objects|--literal-pathspecs))+)(?=\s+[a-z])/g, 'git')
+    .replace(/(\bgit\s+(?:commit|tag|merge|revert|notes\s+add)\b[^;&|]*?\s(?:-[a-zA-Z]*m|--message)(?:=|\s+))("(?:[^"\\]|\\.)*"|'[^']*')/g, '$1""');
 }
 
 const ORDER = { deny: 3, ask: 2, allow: 1 };
@@ -47,8 +56,9 @@ function evaluate(command, policy) {
   const seen = new Set();
   const candidates = [];
   const add = s => { const t = stripPrefixes(s.trim()); if (t && !seen.has(t)) { seen.add(t); candidates.push(t); } };
+  const whole = stripPrefixes(text.trim());
   add(text);
-  const queue = [text];
+  const queue = [...new Set([text, whole])];
   for (let depth = 0; depth < 3 && queue.length; depth++) {
     const next = [];
     for (const c of queue) { splitCommand(c).forEach(add); innerCommands(c).forEach(inner => { add(inner); next.push(inner); }); }
@@ -59,8 +69,8 @@ function evaluate(command, policy) {
     const hits = policy.rules.filter(r => compile(r).test(part));
     if (!hits.length) continue;
     const exempt = hits.find(r => r.action === 'allow' && r.source === 'project');
-    if (exempt && part !== text) continue;             // a project allow rule covers this part
-    if (exempt && part === text) { if (best.decision === 'allow') best = { decision: 'allow', rule: exempt.id, why: exempt.why || 'Allowed by project rule.', part }; continue; }
+    if (exempt && part !== candidates[0]) continue;             // a project allow rule covers this part
+    if (exempt && part === candidates[0]) { if (best.decision === 'allow') best = { decision: 'allow', rule: exempt.id, why: exempt.why || 'Allowed by project rule.', part }; continue; }
     const worst = hits.filter(r => r.action !== 'allow').sort((a, b) => ORDER[b.action] - ORDER[a.action])[0];
     if (worst && ORDER[worst.action] > ORDER[best.decision]) best = { decision: worst.action, rule: worst.id, why: worst.why, part };
     if (best.decision === 'deny') break;

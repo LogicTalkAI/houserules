@@ -131,6 +131,27 @@ test('init, sync, hooks, secret scan, check, uninstall', async t => {
   });
 });
 
+test('guard errors: allowed by default, blocked with failClosed; uninstall cleans .gitignore', t => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'houserules-'));
+  t.after(() => fs.rmSync(d, { recursive: true, force: true }));
+  git(d, 'init', '-q');
+  assert.equal(run(d, 'init', '--tools', 'claude').status, 0);
+  assert.match(read(d, '.gitignore'), /houserules:begin[\s\S]*\.houserules\/audit\.log/);
+  const policyFile = path.join(d, '.houserules', 'policy.json');
+  const p = JSON.parse(fs.readFileSync(policyFile, 'utf8'));
+  p.rules = [{ id: 'broken-rule', action: 'deny', match: '(' }];          // an invalid pattern makes the guard throw
+  fs.writeFileSync(policyFile, JSON.stringify(p));
+  const input = JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'ls' } });
+  const open = spawnSync(hookCommand('claude'), { shell: true, cwd: d, input, encoding: 'utf8' });
+  assert.equal(open.status, 0); assert.match(open.stderr, /not checked/);
+  fs.writeFileSync(policyFile, JSON.stringify({ ...p, failClosed: true }));
+  const closed = spawnSync(hookCommand('claude'), { shell: true, cwd: d, input, encoding: 'utf8' });
+  assert.equal(closed.status, 2); assert.match(closed.stderr, /failClosed/);
+  fs.writeFileSync(policyFile, JSON.stringify({ version: 1, tools: ['claude'] }));
+  assert.equal(rt(d, 'uninstall').status, 0);
+  assert.equal(fs.existsSync(path.join(d, '.gitignore')), false, '.gitignore House Rules created is removed');
+});
+
 test('--tools limits what is written', t => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'houserules-'));
   t.after(() => fs.rmSync(d, { recursive: true, force: true }));

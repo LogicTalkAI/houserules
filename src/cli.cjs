@@ -12,7 +12,7 @@ const G = require('./generate.cjs');
 const hook = require('./githook.cjs');
 const { detect } = require('./detect.cjs');
 const T = require('./templates.cjs');
-const { writeIfChanged, readIf } = require('./blocks.cjs');
+const { writeIfChanged, readIf, upsertBlock, removeBlock } = require('./blocks.cjs');
 const { stringify } = require('./jsonfile.cjs');
 
 const HELP = `House Rules ${VERSION}: one rulebook for every AI coding assistant.
@@ -92,9 +92,17 @@ function cmdGuard(argv) {
     if (ans.stderr) process.stderr.write(ans.stderr + '\n');
     return ans.code;
   } catch (e) {
+    // Default: an internal error lets the command through, so a House Rules bug never stops every command an
+    // assistant runs. Teams that prefer to block instead set "failClosed": true in .houserules/policy.json.
+    if (failClosed()) { err(`House Rules: guard error, command blocked (failClosed is on): ${e && e.message}`); return 2; }
     err(`House Rules: guard error, command not checked: ${e && e.message}`);
     return 0;
   }
+}
+
+function failClosed() {
+  try { return JSON.parse(fs.readFileSync(path.join(findRoot(), '.houserules', 'policy.json'), 'utf8').replace(/^﻿/, '')).failClosed === true; }
+  catch { return false; }
 }
 
 function cmdTest(argv) {
@@ -166,12 +174,21 @@ function cmdAudit(argv) {
 }
 
 // ---------- init / sync / uninstall ----------
+// The audit log stays local. Kept in a marked block so uninstall can take it out again.
+const GITIGNORE_BODY = '.houserules/audit.log';
 function ensureGitignore(root) {
   const file = path.join(root, '.gitignore');
-  const cur = readIf(file) || '';
-  if (/^\/?\.houserules\/audit\.log$/m.test(cur)) return false;
-  writeIfChanged(file, (cur && !cur.endsWith('\n') ? cur + '\n' : cur) + '# House Rules: local log of blocked commands\n.houserules/audit.log\n');
-  return true;
+  const cur = (readIf(file) || '').replace(/^# House Rules: local log of blocked commands\r?\n\.houserules\/audit\.log\r?\n?/m, '');
+  const next = upsertBlock(cur, GITIGNORE_BODY, 'hash');
+  return writeIfChanged(file, next);
+}
+function removeGitignore(root) {
+  const file = path.join(root, '.gitignore');
+  const cur = readIf(file);
+  if (cur == null) return false;
+  const next = removeBlock(cur, 'hash');
+  if (!next.trim()) { fs.unlinkSync(file); return true; }
+  return writeIfChanged(file, next);
 }
 
 function report(changed, skipped, warnings) {
@@ -235,6 +252,7 @@ function cmdUninstall(argv) {
   const { changed, skipped } = G.runOps(root, plan, { undo: true });
   const h = hook.uninstall(root);
   if (h.changed) changed.push('git pre-commit hook (House Rules part)');
+  if (removeGitignore(root)) changed.push('.gitignore (House Rules part)');
   if (flag(argv, '--all')) { fs.rmSync(path.join(root, '.houserules'), { recursive: true, force: true }); changed.push('.houserules/ (deleted)'); }
   out('Removed House Rules from this project.');
   changed.forEach(f => out(`  ${f}`));
@@ -277,7 +295,7 @@ function cmdDoctor() {
   let problems = 0;
   const line = (ok, text) => { out(`${ok ? '  OK  ' : '  !!  '} ${text}`); if (!ok) problems++; };
   out(`House Rules ${VERSION}, project: ${root}\n`);
-  if (!fs.existsSync(path.join(root, '.houserules'))) { out('House Rules is not set up here. Run: npx @logictalkai/houserules init'); return 1; }
+  if (!fs.existsSync(path.join(root, '.houserules'))) { out('House Rules is not set up here. Run: npx github:LogicTalkAI/houserules init'); return 1; }
   const plan = G.buildPlan(root);
   out('Setup');
   line(!plan.errors.length, plan.errors.length ? `policy or skills have errors:\n       ${plan.errors.join('\n       ')}` : `policy valid: ${plan.policy.rules.length} command rules, ${plan.policy.protectedPaths.length} protected file patterns, ${plan.skills.length} skill(s)`);

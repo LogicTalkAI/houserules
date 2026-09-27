@@ -1,7 +1,7 @@
 {
   "name": "@logictalkai/houserules",
   "version": "1.0.0",
-  "description": "One rulebook for every AI coding assistant. Write your rules, skills, and guardrails once; Claude Code, Codex, Copilot, Cursor, Gemini CLI, and Grok all follow them, with a command guard and a secret scan that actually enforce them.",
+  "description": "One rulebook for every AI coding assistant. Write your rules, skills, and guardrails once; Claude Code, Codex, Copilot, Cursor, Gemini CLI, and Grok all follow them, plus a command guard and a secret scan that enforce the parts that matter.",
   "bin": {
     "houserules": "bin/houserules.cjs"
   },

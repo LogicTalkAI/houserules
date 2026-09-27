@@ -9,7 +9,7 @@ const path = require('path');
 const DEFAULT_RULES = [
   // ---- destroys data or the machine ----
   { id: 'rm-rf-root', action: 'deny', why: 'Recursive delete of the root, home, or current folder.',
-    match: String.raw`\brm\s+(?:-[a-zA-Z]+\s+)*-[a-zA-Z]*(?:[rR][a-zA-Z]*f|f[a-zA-Z]*[rR])[a-zA-Z]*\s+(?:-[a-zA-Z-]+\s+)*(?:\/|\/\*|~|~\/|\*|\.|\.\/|\.\.|\$HOME|\$\{HOME\})(?=\s|$|[;&|])` },
+    match: String.raw`\brm\s+(?:-[a-zA-Z]+\s+)*-[a-zA-Z]*(?:[rR][a-zA-Z]*f|f[a-zA-Z]*[rR])[a-zA-Z]*\s+(?:-[a-zA-Z-]+\s+)*(["']?)(?:\/|\/\*|~|~\/|\*|\.|\.\/|\.\.|\$HOME|\$\{HOME\})\1(?=\s|$|[;&|])` },
   { id: 'ps-remove-root', action: 'deny', why: 'PowerShell recursive delete of a drive root, home, or everything in the folder.',
     match: String.raw`\b(?:Remove-Item|rm|ri|del|rd|rmdir)\b(?=[^;&|]*-Recurse)[^;&|]*\s(?:[A-Za-z]:\\?|\\|~|\$HOME|\$env:USERPROFILE|\*|\.)(?=\s|$|[;&|])` , flags: 'i' },
   { id: 'disk-wipe', action: 'deny', why: 'Formats or overwrites a disk.',
@@ -20,8 +20,13 @@ const DEFAULT_RULES = [
   { id: 'pipe-to-shell', action: 'deny', why: 'Downloads a script and runs it without anyone reading it.',
     match: String.raw`\b(?:curl|wget|iwr|irm|Invoke-WebRequest|Invoke-RestMethod)\b[^;&]*\|\s*(?:sudo\s+)?(?:ba|z|da|k|fi)?sh\b|\b(?:curl|wget|iwr|irm|Invoke-WebRequest|Invoke-RestMethod)\b[^;&]*\|\s*(?:iex|Invoke-Expression)\b|\b(?:ba|z)?sh\s+<\(\s*(?:curl|wget)\b`, flags: 'i' },
   // ---- leaks secrets ----
-  { id: 'read-secret-file', action: 'deny', why: 'Prints a file that usually holds keys or passwords.',
-    match: String.raw`\b(?:cat|type|more|less|head|tail|bat|nl|strings|Get-Content|gc|Select-String)\b[^;&|]*(?:^|[\s\/\\"'=])(?:\.env(?:\.[\w.-]+)?|\.dev\.vars|id_rsa|id_ed25519|[\w.-]+\.pem|[\w.-]+\.p12|[\w.-]+\.pfx|credentials\.json|secrets?\.(?:json|ya?ml|toml))(?=["'\s]|$)`, flags: 'i' },
+  // SECRET_FILE: .env files (not .env.example / .sample / .template), SSH keys, certificates, credential files.
+  { id: 'read-secret-file', action: 'deny', why: 'Prints or encodes a file that usually holds keys or passwords.',
+    match: String.raw`\b(?:cat|type|more|less|head|tail|bat|nl|strings|Get-Content|gc|Select-String|base64|xxd|od|hexdump|certutil|openssl\s+base64)\b[^;&|]*(?:^|[\s\/\\"'=<])(?:\.env(?!\.(?:example|sample|template|dist|defaults)\b)(?:\.[\w.-]+)?|\.dev\.vars|id_rsa|id_ed25519|[\w.-]+\.pem|[\w.-]+\.p12|[\w.-]+\.pfx|credentials\.json|secrets?\.(?:json|ya?ml|toml))(?=["'\s]|$)`, flags: 'i' },
+  { id: 'copy-secret-file', action: 'deny', why: 'Copies a file that usually holds keys or passwords.',
+    match: String.raw`\b(?:cp|copy|Copy-Item|scp|rsync|mv)\s+(?:-{1,2}[\w-]+\s+)*["']?(?:[^\s"']*[\/\\])?(?:\.env(?!\.(?:example|sample|template|dist|defaults)\b)(?:\.[\w.-]+)?|\.dev\.vars|id_rsa|id_ed25519|[\w.-]+\.pem|[\w.-]+\.p12|[\w.-]+\.pfx|credentials\.json|secrets?\.(?:json|ya?ml|toml))["']?\s`, flags: 'i' },
+  { id: 'upload-secret-file', action: 'deny', why: 'Sends a file that usually holds keys or passwords to another computer.',
+    match: String.raw`(?:@|\s-T\s+|--upload-file\s+|-InFile\s+)["']?(?:[^\s"']*[\/\\])?(?:\.env(?!\.(?:example|sample|template|dist|defaults)\b)(?:\.[\w.-]+)?|\.dev\.vars|id_rsa|id_ed25519|[\w.-]+\.pem|[\w.-]+\.p12|[\w.-]+\.pfx|credentials\.json|secrets?\.(?:json|ya?ml|toml))(?=["'\s]|$)`, flags: 'i' },
   { id: 'print-all-env', action: 'deny', why: 'Prints every environment variable, which usually includes API keys.',
     match: String.raw`(?:^|[;&|]\s*)(?:printenv|env|set|export\s+-p)\s*(?=$|[|;&>])|\bGet-ChildItem\s+env:|\b(?:gci|dir|ls)\s+env:`, flags: 'i' },
   { id: 'echo-secret-var', action: 'deny', why: 'Prints a variable that looks like a key, token, or password.',
@@ -30,7 +35,7 @@ const DEFAULT_RULES = [
   { id: 'git-no-verify', action: 'deny', why: 'Skips the git hooks, including the House Rules secret scan.',
     match: String.raw`\bgit\s+(?:commit|push|merge|rebase|am|cherry-pick|revert)\b[^;&|]*\s--no-verify(?=\s|$)|\bgit\s+commit\b[^;&|]*\s-[a-zA-Z]*n[a-zA-Z]*(?=\s|$)` },
   { id: 'git-force-push-main', action: 'deny', why: 'Force-pushes over the main branch, erasing other people\'s work.',
-    match: String.raw`\bgit\s+push\b(?=[^;&|]*\s(?:--force(?:-with-lease)?|-f)(?=\s|$))[^;&|]*\s\+?(?:main|master|production|prod)(?=\s|$)` },
+    match: String.raw`\bgit\s+push\b(?=[^;&|]*\s(?:--force(?:-with-lease)?(?:=\S*)?|-[a-zA-Z]*f[a-zA-Z]*)(?=\s|$))[^;&|]*\s\+?(?:[^\s:]+:)?(?:refs\/heads\/)?(?:main|master|production|prod)(?=\s|$)` },
   // ---- needs a person ----
   { id: 'git-force-push', action: 'ask', why: 'Force push rewrites shared history.', match: String.raw`\bgit\s+push\b[^;&|]*\s(?:--force(?:-with-lease)?|-f)(?=\s|$)` },
   { id: 'git-push', action: 'ask', why: 'Push sends code to a shared remote, which may deploy it.', match: String.raw`\bgit\s+push\b` },
