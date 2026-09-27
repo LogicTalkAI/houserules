@@ -35,7 +35,7 @@ const DEFAULT_RULES = [
   { id: 'git-no-verify', action: 'deny', why: 'Skips the git hooks, including the House Rules secret scan.',
     match: String.raw`\bgit\s+(?:commit|push|merge|rebase|am|cherry-pick|revert)\b[^;&|]*\s--no-verify(?=\s|$)|\bgit\s+commit\b[^;&|]*\s-[a-zA-Z]*n[a-zA-Z]*(?=\s|$)` },
   { id: 'git-force-push-main', action: 'deny', why: 'Force-pushes over the main branch, erasing other people\'s work.',
-    match: String.raw`\bgit\s+push\b(?=[^;&|]*\s(?:--force(?:-with-lease)?(?:=\S*)?|-[a-zA-Z]*f[a-zA-Z]*)(?=\s|$))[^;&|]*\s\+?(?:[^\s:]+:)?(?:refs\/heads\/)?(?:main|master|production|prod)(?=\s|$)` },
+    match: String.raw`\bgit\s+push\b(?=[^;&|]*\s(?:--force(?:-with-lease)?(?:=\S*)?|-[a-zA-Z]*f[a-zA-Z]*)(?=\s|$))[^;&|]*\s\+?(?:[^\s:]+:)?(?:refs\/heads\/)?(?:main|master|production|prod)(?=\s|$)|\bgit\s+push\b[^;&|]*\s\+(?:[^\s:]+:)?(?:refs\/heads\/)?(?:main|master|production|prod)(?=\s|$)` },
   // ---- needs a person ----
   { id: 'git-force-push', action: 'ask', why: 'Force push rewrites shared history.', match: String.raw`\bgit\s+push\b[^;&|]*\s(?:--force(?:-with-lease)?|-f)(?=\s|$)` },
   { id: 'git-push', action: 'ask', why: 'Push sends code to a shared remote, which may deploy it.', match: String.raw`\bgit\s+push\b` },
