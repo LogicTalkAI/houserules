@@ -22,6 +22,7 @@ Usage: houserules <command> [options]
   init        Set up House Rules in this project (safe to run again).
                 --tools claude,codex,...   only these assistants (default: all supported)
                 --no-git-hook              skip the pre-commit secret scan
+                --no-sample-skill          do not add the starter "safe-change" skill
   sync        Rewrite every assistant's files from .houserules/ after you edit it.
   doctor      Check setup, prove each assistant's hook blocks a dangerous command, list next steps.
   check       For CI: fail if files are out of sync, the policy is invalid, or a tracked file holds a secret.
@@ -205,7 +206,8 @@ function cmdInit(argv) {
   put('rules.md', T.RULES_MD);
   put('policy.json', stringify(policy));
   put('README.md', T.README_MD);
-  put('skills/safe-change/SKILL.md', T.SKILL_SAFE_CHANGE);
+  if (!flag(argv, '--no-sample-skill')) put('skills/safe-change/SKILL.md', T.SKILL_SAFE_CHANGE);
+  else fs.mkdirSync(path.join(hr, 'skills'), { recursive: true });
   if (tools && !created.includes('.houserules/policy.json')) {
     const f = path.join(hr, 'policy.json');
     try { const cur = JSON.parse(fs.readFileSync(f, 'utf8')); cur.tools = policy.tools; fs.writeFileSync(f, stringify(cur)); } catch { err('Could not update "tools" in .houserules/policy.json; edit it by hand.'); }

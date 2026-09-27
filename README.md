@@ -131,7 +131,7 @@ format (`name` matching the folder, and a `description`). House Rules copies the
 
 | Command | What it does |
 |---|---|
-| `init [--tools a,b] [--no-git-hook]` | Set up (safe to run again). |
+| `init [--tools a,b] [--no-git-hook] [--no-sample-skill]` | Set up (safe to run again). |
 | `sync` | Rewrite every assistant's files after you edit `.houserules/`. |
 | `doctor` | Check setup and prove every hook blocks and allows correctly. |
 | `check` | For CI: fails if files are out of sync, the policy is invalid, or a tracked file holds a secret. |
