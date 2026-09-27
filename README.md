@@ -31,7 +31,7 @@ House Rules keeps one source in `.houserules/` and does two jobs:
 | Assistant | Instructions | Command guard | Skills |
 |---|---|---|---|
 | Claude Code | `CLAUDE.md` imports `AGENTS.md` | `PreToolUse` hook in `.claude/settings.json`, plus read/edit deny rules for secret files | `.claude/skills/` |
-| OpenAI Codex (CLI, VS Code) | `AGENTS.md` | `PreToolUse` hook in `.codex/hooks.json`; `.codex/config.toml` sets `approval_policy = "on-request"`, `sandbox_mode = "workspace-write"` | `.agents/skills/` |
+| OpenAI Codex | `AGENTS.md` | `PreToolUse` hook in `.codex/hooks.json`; `.codex/config.toml` sets `approval_policy = "on-request"`, `sandbox_mode = "workspace-write"` | `.agents/skills/` |
 | GitHub Copilot | `AGENTS.md` (turned on in `.vscode/settings.json`) | `preToolUse` hook in `.github/hooks/houserules.json` | `.agents/skills/`, `.claude/skills/` |
 | Cursor | `AGENTS.md` | `beforeShellExecution` hook in `.cursor/hooks.json` | `.agents/skills/` |
 | Gemini CLI | `AGENTS.md` (added to `context.fileName`) | `BeforeTool` hook in `.gemini/settings.json` | `.agents/skills/` |
@@ -197,7 +197,8 @@ and settings it changed go back to what they were.
 
 ## Requirements
 
-Node.js 18 or newer. Git, for the secret scan. Windows, macOS, and Linux.
+Node.js 18 or newer, and Git for the secret scan. Built for Windows, macOS, and Linux; CI runs the full test suite
+on all three with Node 18, 20, and 22.
 
 ## License
 
