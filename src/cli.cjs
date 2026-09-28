@@ -147,7 +147,8 @@ function cmdScan(argv) {
     if (policy.secrets && policy.secrets.scanOnCommit === false) return 0;
     res = S.scanStaged(root, allow, ignore);
   } else {
-    const paths = argv.filter(a => !a.startsWith('--'));
+    // Paths typed on the command line are relative to the folder the person is in, not the project root.
+    const paths = argv.filter(a => !a.startsWith('--')).map(p => path.relative(root, path.resolve(process.cwd(), p)) || '.');
     const targets = paths.length ? paths : (trackedFiles(root) || []);
     res = targets.length ? S.scanPaths(root, targets, allow, ignore) : S.scanPaths(root, ['.'], allow, ignore);
     for (const f of targets) if (S.forbiddenFile(f) && !S.ignored(f, ignore)) res.hits.push({ file: f, line: 0, id: 'forbidden-file', preview: 'this kind of file holds secrets; remove it from git and add it to .gitignore' });

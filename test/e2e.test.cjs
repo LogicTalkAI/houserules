@@ -152,6 +152,17 @@ test('guard errors: allowed by default, blocked with failClosed; uninstall clean
   assert.equal(fs.existsSync(path.join(d, '.gitignore')), false, '.gitignore House Rules created is removed');
 });
 
+test('scan paths are relative to the current folder, even inside a sub-folder of the project', t => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'houserules-'));
+  t.after(() => fs.rmSync(d, { recursive: true, force: true }));
+  git(d, 'init', '-q');
+  assert.equal(run(d, 'init', '--tools', 'claude').status, 0);
+  write(d, 'app/src/a.js', 'ok\n'); write(d, 'app/src/b.js', `k = "${'AKIA' + 'Z7QK4WJ2M9XB3N5P'}"\n`);
+  const r = spawnSync(process.execPath, [BIN, 'scan', 'src'], { cwd: path.join(d, 'app'), encoding: 'utf8' });
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stdout, /app\/src\/b\.js:1/);
+});
+
 test('--tools limits what is written', t => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'houserules-'));
   t.after(() => fs.rmSync(d, { recursive: true, force: true }));
