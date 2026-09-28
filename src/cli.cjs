@@ -44,11 +44,12 @@ const err = (...a) => process.stderr.write(a.join(' ') + '\n');
 function flag(argv, name) { return argv.includes(name); }
 function opt(argv, name) { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : undefined; }
 
-// The project root: the folder holding .houserules/ (walking up), else the git root, else the current folder.
+// The project root: walking up, the first folder that holds .houserules/ or is a git repository root, so a project
+// nested inside another project (its own .git) is treated as its own project. Else the current folder.
 function findRoot(start = process.cwd()) {
   let d = path.resolve(start);
   for (;;) {
-    if (fs.existsSync(path.join(d, '.houserules'))) return d;
+    if (fs.existsSync(path.join(d, '.houserules')) || fs.existsSync(path.join(d, '.git'))) return d;
     const up = path.dirname(d);
     if (up === d) break;
     d = up;

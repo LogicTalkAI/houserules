@@ -163,6 +163,19 @@ test('scan paths are relative to the current folder, even inside a sub-folder of
   assert.match(r.stdout, /app\/src\/b\.js:1/);
 });
 
+test('a git repository nested inside a House Rules project is its own project', t => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'houserules-'));
+  t.after(() => fs.rmSync(d, { recursive: true, force: true }));
+  git(d, 'init', '-q');
+  assert.equal(run(d, 'init', '--tools', 'claude').status, 0);
+  const inner = path.join(d, 'apps', 'inner'); fs.mkdirSync(inner, { recursive: true });
+  git(inner, 'init', '-q');
+  write(inner, 'x.js', 'ok\n'); git(inner, 'add', 'x.js');
+  const r = spawnSync(process.execPath, [BIN, 'scan'], { cwd: inner, encoding: 'utf8' });
+  assert.equal(r.status, 0); assert.match(r.stdout, /in 1 file\(s\)/, 'scans only the inner repository');
+  assert.match(spawnSync(process.execPath, [BIN, 'doctor'], { cwd: inner, encoding: 'utf8' }).stdout, /not set up here/);
+});
+
 test('--tools limits what is written', t => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'houserules-'));
   t.after(() => fs.rmSync(d, { recursive: true, force: true }));
