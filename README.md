@@ -11,6 +11,21 @@ node .houserules/runtime/houserules.cjs doctor
 
 Two commands. No accounts, no server, no dependencies. Works in VS Code and anywhere these assistants run.
 
+## New to this? Start here
+
+An AI assistant that can run commands on your computer can also delete your files, show your passwords, or publish
+unfinished work. It usually happens by accident. House Rules is a seatbelt for that:
+
+- **It stops the dangerous commands before they run**, like deleting a whole folder or printing a file full of passwords.
+- **It asks you first** before risky ones, like publishing or pushing your work.
+- **It keeps passwords and API keys out of your project history**, whoever wrote the code.
+- **You write your rules once, in plain English**, and every assistant you use reads the same ones.
+
+What you need: [Node.js](https://nodejs.org) 18 or newer (free) and a project folder. Open a terminal in that folder,
+run the two commands above, and read what `doctor` prints. To take it out again, see [Uninstall](#uninstall).
+
+It is a safety net, not a guarantee. [How safe is this?](#how-safe-is-this) lists what it cannot catch.
+
 ---
 
 ## Why
